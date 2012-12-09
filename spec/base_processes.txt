@@ -1,0 +1,53 @@
+There are a few basic processes that can be messaged to do core operating system functions. They will have PID pointers in the listed static memory locations.
+Ex. set a, [5] sets A to the PID of the ALLOC process.
+
+TODO: Come up with more standardized completion error conventions.
+
+PID Address  Name   Features
+5            ALLOC  Coarse grained allocator. Allocates and frees memory for tasks or libraries.
+6            PROCS  Access to the creation and destruction of processes.
+7            LOADER Loads and Links compiled binaries into meory, for tasks or libraries.
+
+8            -      
+
+
+Process Message Interfaces:
+
+IO Processes:
+Message #  Use
+1          Read up to p1 words from the buffer into memory pointed to by p2, signaling completion to struct pointed to by p3.
+           Completion Signal: has_completed = 1 if OK, 2 if EOF, 3 if Error; message = length written into buffer.
+2          Write up to p1 words from the buffer from memory pointed to by p2, signaling completion to struct pointed to by p3.
+           Completion Signal: has_completed = 1 if OK, 2 if stream closed for write, 3 if error; message = length read from buffer.
+		   Note: if the buffer is full and it can't read more data, it may return OK, with 0 read.
+3          Seek to position p1. Signals completion to struct pointed to by p3.
+           Completion Signal: has_completed = 1 if OK, 2 if unsupported, 3 if error. message = 0
+
+
+ALLOC Process:
+Message #  Use
+1          Allocate p1 words (rounded up to next multiple of block size) and assign them to the owner p2. P3 points to completion struct
+           Completion Signal: has_completed = 1. Message = 0 if no error. 1 if allocation could not be made.
+2          Free p2 words (rounded up to next multiple of block size) and free them starting at p1. P3 points to completion struct
+           Completion Signal: has_completed = 1. Message = 0
+3          Free all memory owned by owner p1. P3 points to completion struct
+           Completion Signal: has_completed = 1. Message = freed count.
+
+LOADER Process:
+Message #  Use
+1          Load binary image from output IO process PID = p1, p2=0 means to load it an an executable, p2=1 means load it as a library only. P3 points to completion struct
+           Completion Signal: has_completed = 1 if no error, 2 if IO error, 3 if linker error. Message = Pointer to head of loaded image.
+2          Unload binary image from memory. P1 = pointer given back from message 1. P3 points to completion struct.
+           Completion Signal: has_completed = 1 if no error, 2 if binary has dependancies, 3 if other error.
+
+PROCS Process:
+Message #  Use
+1          Adds task p1 to the execution queue. P3 points to completion struct.
+           Completion Signal: has_completed = 1. message = 0.
+2          Removes task p1 from the execution queue. P3 points to completion struct.
+           Completion Signal: has_completed = 1. message = 0.
+3          Add void(void) function pointer p1 to the tasklet queue. Tasklets are executed in between context transitions, so they will run very often. P3 points to completion struct
+           Tasklet functions may not use any sys-calls, and use a standard return to exit.
+		   Completion Signal: has_completed = 1. message = 0 if no error, 1 if tasklet slots are all used up.
+4          Removes tasklet function p1 from the tasklet queue. P3 points to completion struct.
+           Completion Signal: has_completed = 1. message = 0 if ok, 1 if tasklet not present

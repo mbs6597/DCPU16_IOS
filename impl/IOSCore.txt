@@ -1,0 +1,143 @@
+set pc, init
+dat sys_wfcomp, sys_getmsg, sys_comp
+dat pid_alloc, pid_procs, pid_loader
+
+:current_proc
+dat pid_a
+
+
+:init
+set [0], sys_yield
+set [1], sys_msg
+
+set sp, astack
+set pc, afunc
+
+:end
+set pc, end
+
+:sys_yield
+set a, [current_proc]
+set [a+7], sp
+set a, [a+6]
+set sp, [a+7]
+set [current_proc], a
+set pc, pop
+
+:sys_msg
+:sys_wfcomp
+set [a], 0
+set [a+1], 0
+
+:sys_wfcomp_lp
+set push, a
+jsr sys_yield
+set a, pop
+ife [a], 0
+set pc, sys_wfcomp_lp
+
+set b,[a]
+set c,[a+1]
+set pc, pop
+
+:sys_getmsg
+:sys_comp
+set [a], b
+set [a+1], c
+set pc, pop
+
+
+:pid_alloc
+:pid_procs
+:pid_loader
+
+
+:namea
+dat "proc a",0
+
+:pid_a
+dat namea       ;common_name
+dat 0,0,0,0     ;family relationships - not in use yet
+dat pid_b,pid_b ;schedule before and after - both are the other process
+dat astack-1    ;saved sp
+dat 0           ;msg start, qty
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
+dat 0           ;sig handler, unimplemented
+dat 0, 0        ;std in/out procs - unimplemented
+:endpid_a
+
+dat 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+:astack
+
+:afunc
+set z, 10
+jsr [0]
+jsr [0]
+jsr [0]
+set a, bcompstruct
+set b, 1
+set c, 1
+jsr [4]
+set pc, afunc
+
+
+:nameb
+dat "proc b",0
+
+:pid_b
+dat nameb       ;common_name
+dat 0,0,0,0     ;family relationships - not in use yet
+dat pid_a,pid_a ;schedule before and after - both are the other process
+dat bstack-1    ;saved sp
+dat 0           ;msg start, qty
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
+dat 0           ;sig handler, unimplemented
+dat 0, 0        ;std in/out procs - unimplemented
+:endpid_b
+
+dat 0, 0, 0, 0, 0, 0, 0, 0, 0, bfunc
+:bstack
+
+:bcompstruct
+dat 0,0,0
+
+:bfunc
+set a, bcompstruct
+jsr [2]
+set z, 1
+set pc, bfunc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
