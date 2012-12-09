@@ -1,3 +1,4 @@
+:raw_image_start
 set pc, kickoff
 dat sys_wfcomp, sys_getmsg, sys_comp
 dat pid_alloc, pid_procs, pid_loader
@@ -7,7 +8,6 @@ dat pid_init
 dat pid_alloc
 dat pid_procs
 dat pid_loader
-
 
 :kickoff
 set [0], sys_yield
@@ -147,15 +147,16 @@ dat "LOADER",0
 dat namealloc            ;common_name
 dat 0,0,0,0              ;reserved
 dat pid_init,pid_procs
-dat allocstack-1         ;saved sp
+dat allocstack           ;saved sp
 dat 0                    ;msg start, qty
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
 dat 0                    ;reserved
 dat 0, 0                 ;std in/out procs - unimplemented
 
 
-dat 0, 0, 0, 0, 0, 0, 0, alloc_func
+dat 0, 0, 0, 0, 0, 0, 0
 :allocstack
+dat alloc_func
 
 
 
@@ -163,15 +164,16 @@ dat 0, 0, 0, 0, 0, 0, 0, alloc_func
 dat nameprocs            ;common_name
 dat 0,0,0,0              ;reserved
 dat pid_alloc,pid_loader
-dat procsstack-1         ;saved sp
+dat procsstack           ;saved sp
 dat 0                    ;msg start, qty
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
 dat 0                    ;reserved
 dat 0, 0                 ;std in/out procs - unimplemented
 
 
-dat 0, 0, 0, 0, 0, 0, 0, procs_func
+dat 0, 0, 0, 0, 0, 0, 0
 :procsstack
+dat procs_func
 
 
 
@@ -179,15 +181,16 @@ dat 0, 0, 0, 0, 0, 0, 0, procs_func
 dat nameloader           ;common_name
 dat 0,0,0,0              ;reserved
 dat pid_procs,pid_init
-dat loaderstack-1        ;saved sp
+dat loaderstack          ;saved sp
 dat 0                    ;msg start, qty
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
 dat 0                    ;reserved
 dat 0, 0                 ;std in/out procs - unimplemented
 
 
-dat 0, 0, 0, 0, 0, 0, 0, loader_func
+dat 0, 0, 0, 0, 0, 0, 0
 :loaderstack
+dat loader_func
 
 
 
@@ -195,7 +198,7 @@ dat 0, 0, 0, 0, 0, 0, 0, loader_func
 dat nameinit             ;common_name
 dat 0,0,0,0              ;reserved
 dat pid_loader,pid_alloc
-dat initstack-1          ;saved sp
+dat initstack            ;saved sp
 dat 0                    ;msg start, qty
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
 dat 0                    ;reserved
@@ -217,14 +220,37 @@ jsr [0]
 set pc, init_func
 
 :alloc_func
-set a, a
-set a, a
-set a, a
-set a, a
-set a, a
-set a, a
-jsr [0]
-set pc, alloc_func
+;Have alloc claim all of the static kernel image as its own memory
+	set x, kernel_bss_end
+	shr x, 8
+
+	ifn ex, 0
+	add x, 1  ;divide by 256 round up
+	set y, 0
+
+:alloc_claim_loop
+	ife x, 0
+	set pc, alloc_clear_loop
+
+	set [y+alloc_map_start], pid_alloc
+	add y, 1
+	sub x, 1
+	
+	set pc, alloc_claim_loop
+
+:alloc_clear_loop
+	ife y, alloc_map_end-alloc_map_start
+	set pc, alloc_loop
+	set [y+alloc_map_start], 0
+	add y, 1
+	set pc, alloc_clear_loop
+
+:alloc_loop
+	jsr [0]
+	set pc, alloc_loop
+
+
+
 
 :procs_func 
 set a, a
@@ -246,3 +272,28 @@ set a, a
 jsr [0]
 set pc, loader_func
 
+:raw_image_end
+
+:kernel_bss_start
+
+:alloc_map_start
+dat 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+:alloc_map_end
+
+
+:kernel_bss_end
