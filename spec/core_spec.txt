@@ -1,11 +1,11 @@
 Syscalls are pointers in low ram that can be used with the JSR instruction. Ex: jsr [1] executes the syscall MSG.
 
 #   Name    Params       Returns    Destroys     Notes/Desc
-0   YIELD   NONE         NONE       ABCXYZ EX    Context switches to the next task.
-1   MSG     ABXYZ        NONE       ABCXYZ EX    Message PID A, with message B, giving parameters X, Y and Z
-2   WFCOMP  A            BC         ABCXYZ EX    Waits for completion structure pointed to by A to be completed, returns the return code in B, and message in C.
-3   GETMSG  NONE         ABXYZ      ABCXYZ EX    Gets a message, stores sending PID in A, message in B, and the parameters in XYZ. If no message is in queue it will set A = 0.
-4   COMP    ABC          NONE       -            Signals a completion to a struct completion pointed to by A with has_completed = B and message c.
+0   YIELD   NONE         NONE       ABCXYZIJ EX    Context switches to the next task.
+1   MSG     ABXYZ        NONE       ABCXYZIJ EX    Message PID A, with message B, giving parameters X, Y and Z
+2   WFCOMP  A            BC         ABCXYZIJ EX    Waits for completion structure pointed to by A to be completed, returns the return code in B, and message in C.
+3   GETMSG  NONE         ABXYZ      ABCXYZIJ EX    Gets a message, stores sending PID in A, message in B, and the parameters in XYZ. If no message is in queue it will set A = 0.
+4   COMP    ABC          NONE       -              Signals a completion to a struct completion pointed to by C with code = A and message B.
 
 Core System Structs & deffinitions:
 
@@ -23,10 +23,7 @@ struct {
 
 struct {
 	u16 *common_name;                      //offset 0
-	struct task *parent;                   //offset 1
-	struct task *next_peer;                //offset 2
-	struct task *prev_peer;                //offset 3
-	struct task *child;                    //offset 4
+	u16 reserved [4];            
 	
 	struct task *sched_prev;               //offset 5
 	struct task *sched_next;               //offset 6
@@ -38,14 +35,10 @@ struct {
 	
 	struct pending_msg messages[4];        //offset 9
 	
-	void (sighand *)(int signal,int data); //offset 29. Pointer to signal handler.
+	u16 reserved.                          //offset 29.
 	
 	u16 stdout_process;                    //offset 30
 	u16 stdin_process;                     //offset 31
 	
 } task;
 
-Predefined Signals:
-signal  data  Name   Meaning
-1       PTR   Kill   The task is being asked to die.
-2       PID   Chld   Child death. The given child process has been killed
