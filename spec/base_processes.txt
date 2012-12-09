@@ -13,41 +13,55 @@ PID Address  Name   Features
 
 Process Message Interfaces:
 
+Completion Conventions:
+code  meaning
+1     OK               The operation worked
+2     STATE_ERROR      The process is not in the proper state to receive this message
+3     EXECUTION_ERROR  The process had a runtime error when acting on the message sent, see message for details
+4     UNSUPPORTED      The process does not support this kind of message.
+
+Execution Error Message Conventions
+message  meaning
+0        No error
+1        IO based error
+2        Logical Error
+3        Resource unavailability error
+
 IO Processes:
 Message #  Use
 1          Read up to p1 words from the buffer into memory pointed to by p2, signaling completion to struct pointed to by p3.
-           Completion Signal: has_completed = 1 if OK, 2 if EOF, 3 if Error; message = length written into buffer.
+           Completion Signal: standard cdoes, message = length written into buffer on success
 2          Write up to p1 words from the buffer from memory pointed to by p2, signaling completion to struct pointed to by p3.
-           Completion Signal: has_completed = 1 if OK, 2 if stream closed for write, 3 if error; message = length read from buffer.
-		   Note: if the buffer is full and it can't read more data, it may return OK, with 0 read.
+           Completion Signal: standard codes, message = length read from buffer on success
+		   Note: if the buffer is full and it can't read/write more data, it may return OK, with 0 read/written.
 3          Seek to position p1. Signals completion to struct pointed to by p3.
-           Completion Signal: has_completed = 1 if OK, 2 if unsupported, 3 if error. message = 0
+           Completion Signal: standard codes
 
 
 ALLOC Process:
 Message #  Use
 1          Allocate p1 words (rounded up to next multiple of block size) and assign them to the owner p2. P3 points to completion struct
-           Completion Signal: has_completed = 1. Message = 0 if no error. 1 if allocation could not be made.
+           Completion Signal: message = pointer to allocation on success, otherwise code/message conventions are followed.
 2          Free p2 words (rounded up to next multiple of block size) and free them starting at p1. P3 points to completion struct
-           Completion Signal: has_completed = 1. Message = 0
+           Completion Signal: standard codes
 3          Free all memory owned by owner p1. P3 points to completion struct
-           Completion Signal: has_completed = 1. Message = freed count.
+           Completion Signal: standard codes, message = freed count on success
 
 LOADER Process:
 Message #  Use
 1          Load binary image from output IO process PID = p1, p2=0 means to load it an an executable, p2=1 means load it as a library only. P3 points to completion struct
-           Completion Signal: has_completed = 1 if no error, 2 if IO error, 3 if linker error. Message = Pointer to head of loaded image.
+           Completion Signal: standard codes, message = Pointer to head of loaded image on success
 2          Unload binary image from memory. P1 = pointer given back from message 1. P3 points to completion struct.
-           Completion Signal: has_completed = 1 if no error, 2 if binary has dependancies, 3 if other error.
+           Completion Signal: standard codes
 
 PROCS Process:
 Message #  Use
 1          Adds task p1 to the execution queue. P3 points to completion struct.
-           Completion Signal: has_completed = 1. message = 0.
+           Completion Signal: standard codes
 2          Removes task p1 from the execution queue. P3 points to completion struct.
-           Completion Signal: has_completed = 1. message = 0.
+           Completion Signal: standard codes
 3          Add void(void) function pointer p1 to the tasklet queue. Tasklets are executed in between context transitions, so they will run very often. P3 points to completion struct
            Tasklet functions may not use any sys-calls, and use a standard return to exit.
-		   Completion Signal: has_completed = 1. message = 0 if no error, 1 if tasklet slots are all used up.
+		   Completion Signal: standard codes
 4          Removes tasklet function p1 from the tasklet queue. P3 points to completion struct.
-           Completion Signal: has_completed = 1. message = 0 if ok, 1 if tasklet not present
+           Completion Signal: standard codes
