@@ -226,25 +226,19 @@ set pc, init_func
 
 	ifn ex, 0
 	add x, 1  ;divide by 256 round up
-	set y, 0
 
-:alloc_claim_loop
-	ife x, 0
-	set pc, alloc_clear_loop
-
-	set [y+alloc_map_start], pid_alloc
-	add y, 1
-	sub x, 1
+	set i, alloc_map_start
+	set b, x
+	set c, pid_alloc
 	
-	set pc, alloc_claim_loop
-
-:alloc_clear_loop
-	ife y, alloc_map_end-alloc_map_start
-	set pc, alloc_loop
-	set [y+alloc_map_start], 0
-	add y, 1
-	set pc, alloc_clear_loop
-
+	jsr memset
+	
+	set b, alloc_map_end - alloc_map_start
+	sub b, x
+	set c, 0
+	
+	jsr memset
+	
 :alloc_loop
 	jsr [0]
 	set pc, alloc_loop
@@ -272,14 +266,67 @@ set a, a
 jsr [0]
 set pc, loader_func
 
-:raw_image_end
+
+
+
+
+
+
+
+
+:memset         
+;pre:
+;i = start address, b = length, c = value
+;post:
+;i = 1 past last word written, b = undefined, j undefined, all others same
+set pc, memset_lp_cond
+:memset_lp
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+	sti [i], c
+
+	sub b, 16
+
+:memset_lp_cond
+	ifa b, 15
+	set pc, memset_lp
+
+	ifu b, 1
+	set pc, pop
+
+	add b, 7
+	sub pc, b
+
+
+
+
+
+
+
+
+
+
+:kernel_text_end
 
 :kernel_bss_start
 
 :alloc_map_start
-dat 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+dat 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 ;simulating uninitialized data for the hell of it
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 ;in this section. Not sure what "reset" will look
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 ;like so I'm building it in from the start.
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
