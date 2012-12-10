@@ -9,6 +9,9 @@ Where possible symbols SYS_<Name> should be used, ie jsr[SYS_YIELD] is preferred
 5   GETMSG  NONE         ABXYZ      ABCXYZIJ EX    Gets a message, stores sending PID in A, message in B, and the parameters in XYZ. If no message is in queue it will set A = 0.
 6   COMP    ABC          NONE       -              Signals a completion to a struct completion pointed to by C with code = A and message B.
 
+
+Some of these syscalls are trivially implemeted, but you must use the syscall in case the implementation changes. I have plans of de-coupling the message queue from the task structure, as well as integration of wfcomp and messages into the scheduler to avoid dead end context switches.
+
 Core System Structs & deffinitions:
 
 struct {
