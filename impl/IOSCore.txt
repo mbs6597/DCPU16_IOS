@@ -1,3 +1,45 @@
+;Offset declarations
+
+;task struct offsets
+org 0
+:task_common_name_off
+org 5
+:task_sched_prev_off
+org 6
+:task_sched_next_off
+org 7
+:task_saved_sp_off
+org 8
+:task_msg_count_off
+org 9
+:task_msg_queue_off
+org 30
+:task_stdout_pid_off
+org 31
+:task_stdin_pid_off
+org 32
+:task_size
+
+org 4
+:task_qty_messages
+
+;pending_message struct offset
+org 0
+:msg_sender_offset
+org 1
+:msg_message_offset
+org 2
+:msg_p1_offset
+org 3
+:msg_p2_offset
+org 4
+:msg_p3_offset
+org 5
+:msg_size
+
+
+org 0
+
 :raw_image_start
 set pc, kickoff
 dat sys_wfcomp, sys_getmsg, sys_comp
@@ -5,39 +47,81 @@ dat pid_alloc, pid_procs, pid_loader
 
 :current_proc
 dat pid_init
-dat pid_alloc
-dat pid_procs
-dat pid_loader
+
 
 :kickoff
 ;fill syscall entries covered by jump
 set [0], sys_yield
 set [1], sys_msg
 
+;setup core PID structs
+set i, pid_alloc
+set b, 32
+set c, 0
+jsr memset
+
+set [pid_alloc+task_common_name_off], namealloc
+set [pid_alloc+task_saved_sp_off],    allocstack
+set [pid_alloc+task_sched_prev_off],  pid_init
+set [pid_alloc+task_sched_next_off],  pid_procs
+
+
+set i, pid_procs
+set b, 32
+set c, 0
+jsr memset
+
+set [pid_procs+task_common_name_off], nameprocs
+set [pid_procs+task_saved_sp_off],    procsstack
+set [pid_procs+task_sched_prev_off],  pid_alloc
+set [pid_procs+task_sched_next_off],  pid_loader
+
+
+set i, pid_loader
+set b, 32
+set c, 0
+jsr memset
+
+set [pid_loader+task_common_name_off], nameloader
+set [pid_loader+task_saved_sp_off],    loaderstack
+set [pid_loader+task_sched_prev_off],  pid_procs
+set [pid_loader+task_sched_next_off],  pid_init
+
+
+set i, pid_init
+set b, 32
+set c, 0
+jsr memset
+
+set [pid_init+task_common_name_off], nameinit
+set [pid_init+task_sched_prev_off],  pid_loader
+set [pid_init+task_sched_next_off],  pid_alloc
+
 ;setup initial stacks
 set [loaderstack], loader_func
 set [allocstack], alloc_func
 set [procsstack], procs_func
 
+;dive into init process
 set sp, initstack
 set pc, init_func
 
 :sys_yield
 	set a, [current_proc]
-	set [a+7], sp
-	set a, [a+6]
-	set sp, [a+7]
+	set [a+task_saved_sp_off], sp
+	set a, [a+task_sched_next_off]
+	set sp, [a+task_saved_sp_off]
 	set [current_proc], a
 	set pc, pop
 
 :sys_msg
-	add a, 8
+	add a, task_msg_count_off
 	
 :sys_msg_test_ct
 	set c, [a]
-	and c, 0xff ;lower octet of offset 8 = msg_qty
+	and c, 0xff ;lower octet = msg_qty
 	
-	ifl c, 4 
+	ifl c, task_qty_messages 
 	set pc, sys_msg_add_it
 
 	;target has too many messages, yield and try again
@@ -60,24 +144,24 @@ set pc, init_func
 :sys_msg_add_it
 	;at this point c = count of messages in target
 	set i, [a]
-	shr i, 8       ;index of first message now in i
+	shr i, 8         ;index of first message now in i
 	
 	and [a], 0xff00  ;clear message count
 	add c, 1
-	bor [a], c        ;set new message count
+	bor [a], c       ;set new message count
 	sub c, 1
 	
 	add c, i       
-	mod c, 4       ;c = end index in circular buffer
-	mul c, 5       ;c*=sizeof(struct pending_msg)
-	add a, 1       ;move pointer from offset 8 to offset 9
-	add a, c       ;move pointer to entry we should fill in
+	mod c, task_qty_messages ;c = end index in circular buffer
+	mul c, msg_size          ;c*=sizeof(struct pending_msg)
+	add a, (task_msg_queue_off-task_msg_count_off)                
+	add a, c                 ;move pointer to entry we should fill in
 	
-	set [a+0], [current_proc] ;set sender
-	set [a+1], b              ;set message
-	set [a+2], x              ;set params
-	set [a+3], y
-	set [a+4], z
+	set [a+msg_sender_offset],  [current_proc]
+	set [a+msg_message_offset], b              
+	set [a+msg_p1_offset],      x              
+	set [a+msg_p2_offset],      y
+	set [a+msg_p3_offset],      z
 	
 	set pc, pop
 	
@@ -148,50 +232,6 @@ dat "ALLOC",0
 dat "PROCS",0
 :nameloader
 dat "LOADER",0
-
-:pid_alloc
-dat namealloc            ;common_name
-dat 0,0,0,0              ;reserved
-dat pid_init,pid_procs
-dat allocstack           ;saved sp
-dat 0                    ;msg start, qty
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
-dat 0                    ;reserved
-dat 0, 0                 ;std in/out procs - unimplemented
-
-:pid_procs
-dat nameprocs            ;common_name
-dat 0,0,0,0              ;reserved
-dat pid_alloc,pid_loader
-dat procsstack           ;saved sp
-dat 0                    ;msg start, qty
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
-dat 0                    ;reserved
-dat 0, 0                 ;std in/out procs - unimplemented
-
-:pid_loader
-dat nameloader           ;common_name
-dat 0,0,0,0              ;reserved
-dat pid_procs,pid_init
-dat loaderstack          ;saved sp
-dat 0                    ;msg start, qty
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
-dat 0                    ;reserved
-dat 0, 0                 ;std in/out procs - unimplemented
-
-:pid_init
-dat nameinit             ;common_name
-dat 0,0,0,0              ;reserved
-dat pid_loader,pid_alloc
-dat initstack            ;saved sp
-dat 0                    ;msg start, qty
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
-dat 0                    ;reserved
-dat 0, 0                 ;std in/out procs - unimplemented
-
-
-
-
 
 :init_func 
 set a, a
@@ -289,7 +329,50 @@ set pc, memset_lp_cond
 
 :kernel_text_end
 
+
 :kernel_bss_start
+
+:pid_alloc
+dat namealloc            ;common_name
+dat 0,0,0,0              ;reserved
+dat pid_init,pid_procs
+dat allocstack           ;saved sp
+dat 0                    ;msg start, qty
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
+dat 0                    ;reserved
+dat 0, 0                 ;std in/out procs - unimplemented
+
+:pid_procs
+dat nameprocs            ;common_name
+dat 0,0,0,0              ;reserved
+dat pid_alloc,pid_loader
+dat procsstack           ;saved sp
+dat 0                    ;msg start, qty
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
+dat 0                    ;reserved
+dat 0, 0                 ;std in/out procs - unimplemented
+
+:pid_loader
+dat nameloader           ;common_name
+dat 0,0,0,0              ;reserved
+dat pid_procs,pid_init
+dat loaderstack          ;saved sp
+dat 0                    ;msg start, qty
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
+dat 0                    ;reserved
+dat 0, 0                 ;std in/out procs - unimplemented
+
+:pid_init
+dat nameinit             ;common_name
+dat 0,0,0,0              ;reserved
+dat pid_loader,pid_alloc
+dat initstack            ;saved sp
+dat 0                    ;msg start, qty
+dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
+dat 0                    ;reserved
+dat 0, 0                 ;std in/out procs - unimplemented
+
+
 
 :alloc_map_start
 dat 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 ;simulating uninitialized data for the hell of it
