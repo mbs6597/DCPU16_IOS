@@ -1,10 +1,12 @@
 There are a few basic processes that can be messaged to do core operating system functions. They will have PID pointers in the listed static memory locations.
-Ex. set a, [5] sets A to the PID of the ALLOC process.
+Ex. set a, [8] sets A to the PID of the ALLOC process. Where possible symbols SYS_<Name> should be used. For example, it would be better to set a, [SYS_ALLO
 
 PID Address  Name   Features
-5            ALLOC  Coarse grained allocator. Allocates and frees memory for tasks or libraries.
-6            PROCS  Access to the creation and destruction of processes.
-7            LOADER Loads and Links compiled binaries into meory, for tasks or libraries.
+8            ALLOC  Coarse grained allocator. Allocates and frees memory for tasks or libraries.
+9            PROCS  Access to the creation and destruction of processes.
+A            LOADER Loads and Links compiled binaries into meory, for tasks or libraries.
+
+B            -      Current process. This pointer always points to the current process
  
 
 Process Message Interfaces:

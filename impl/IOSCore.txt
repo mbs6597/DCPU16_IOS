@@ -40,73 +40,124 @@ org 5
 
 org 0
 
-:raw_image_start
-set pc, kickoff
-dat sys_wfcomp, sys_getmsg, sys_comp
-dat pid_alloc, pid_procs, pid_loader
+:kernel_text_start
+
+	set pc, kickoff
+
+org 2
+
+:SYS_YIELD
+	dat sys_yield_fn
+
+:SYS_MSG
+	dat sys_msg_fn
+
+:SYS_WFCOMP
+	dat sys_wfcomp_fn
+
+:SYS_GETMSG
+	dat sys_getmsg_fn
+
+:SYS_COMP
+	dat sys_comp_fn
+
+:SYS_ALLOC
+	dat pid_alloc
+
+:SYS_PROCS
+	dat pid_procs
+
+:SYS_LOADER
+	dat pid_loader
 
 :current_proc
-dat pid_init
+	dat pid_init
 
 
 :kickoff
-;fill syscall entries covered by jump
-set [0], sys_yield
-set [1], sys_msg
 
-;setup core PID structs
-set i, pid_alloc
-set b, 32
-set c, 0
-jsr memset
-
-set [pid_alloc+task_common_name_off], namealloc
-set [pid_alloc+task_saved_sp_off],    allocstack
-set [pid_alloc+task_sched_prev_off],  pid_init
-set [pid_alloc+task_sched_next_off],  pid_procs
-
-
-set i, pid_procs
-set b, 32
-set c, 0
-jsr memset
-
-set [pid_procs+task_common_name_off], nameprocs
-set [pid_procs+task_saved_sp_off],    procsstack
-set [pid_procs+task_sched_prev_off],  pid_alloc
-set [pid_procs+task_sched_next_off],  pid_loader
-
-
-set i, pid_loader
-set b, 32
-set c, 0
-jsr memset
-
-set [pid_loader+task_common_name_off], nameloader
-set [pid_loader+task_saved_sp_off],    loaderstack
-set [pid_loader+task_sched_prev_off],  pid_procs
-set [pid_loader+task_sched_next_off],  pid_init
-
-
-set i, pid_init
-set b, 32
-set c, 0
-jsr memset
-
-set [pid_init+task_common_name_off], nameinit
-set [pid_init+task_sched_prev_off],  pid_loader
-set [pid_init+task_sched_next_off],  pid_alloc
+	;setup core PID structs
+	set i, pid_alloc
+	set x, namealloc
+	set y, allocstack-1
+	set j, 0
+	
+	jsr mkblankproc
+	
+	
+	set i, pid_procs
+	set x, nameprocs
+	set y, procsstack-1
+	set j, pid_alloc
+	
+	jsr mkblankproc
+	
+	
+	set i, pid_loader
+	set x, nameloader
+	set y, loaderstack-1
+	set j, pid_procs
+	
+	jsr mkblankproc
+	
+	
+	set i, pid_init
+	set x, nameinit
+	set y, initstack-1
+	set j, pid_loader
+	
+	jsr mkblankproc
 
 ;setup initial stacks
-set [loaderstack], loader_func
-set [allocstack], alloc_func
-set [procsstack], procs_func
+	set [loaderstack-1], loader_func
+	set [allocstack-1], alloc_func
+	set [procsstack-1], procs_func
 
 ;dive into init process
-set sp, initstack
-set pc, init_func
+	set sp, initstack
+	set pc, init_func
 
-:sys_yield
+:mkblankproc
+;pre:
+;i = pid block
+;j = pid to link after, null for self link
+;x = name ptr
+;y = init sp location
+;post:
+;destroys params, b, c
+	set push, i
+	set push, j
+	set b, 32
+	set c, 0
+	jsr memset
+
+	set j, pop
+	set i, pop
+
+	set [i+task_common_name_off], x
+	set [i+task_saved_sp_off],    y
+	
+	ifn j, 0
+	set pc, mkblankproc_link
+
+	set [i+task_sched_prev_off], i
+	set [i+task_sched_next_off], i
+	set pc, pop
+
+:mkblankproc_link
+
+	set [i+task_sched_next_off], [j+task_sched_next_off]
+	set [i+task_sched_prev_off], j
+
+	set c, [i+task_sched_next_off]
+
+	set [c+task_sched_prev_off], i
+	set [j+task_sched_next_off], i
+
+	set pc, pop
+
+
+:sys_yield_fn
 	set a, [current_proc]
 	set [a+task_saved_sp_off], sp
 	set a, [a+task_sched_next_off]
@@ -114,7 +165,7 @@ set pc, init_func
 	set [current_proc], a
 	set pc, pop
 
-:sys_msg
+:sys_msg_fn
 	add a, task_msg_count_off
 	
 :sys_msg_test_ct
@@ -131,7 +182,7 @@ set pc, init_func
 	set push, y
 	set push, z
 	
-	jsr sys_yield
+	jsr sys_yield_fn
 	
 	set z, pop
 	set y, pop
@@ -165,7 +216,7 @@ set pc, init_func
 	
 	set pc, pop
 	
-:sys_wfcomp
+:sys_wfcomp_fn
 	set [a], 0
 	set [a+1], 0
 
@@ -180,7 +231,7 @@ set pc, init_func
 	set c,[a+1]
 	set pc, pop
 
-:sys_getmsg
+:sys_getmsg_fn
 	set a, [current_proc]
 	add a, 8
 	set b, [a]
@@ -219,7 +270,7 @@ set pc, init_func
 	set a, 0
 	set pc, pop
 	
-:sys_comp
+:sys_comp_fn
 	set [c], a
 	set [c+1], b
 	set pc, pop
@@ -240,7 +291,7 @@ set a, a
 set a, a
 set a, a
 set a, a
-jsr [0]
+jsr [SYS_YIELD]
 set pc, init_func
 
 :alloc_func
@@ -264,7 +315,7 @@ set pc, init_func
 	jsr memset
 	
 :alloc_loop
-	jsr [0]
+	jsr [SYS_YIELD]
 	set pc, alloc_loop
 
 
@@ -276,7 +327,7 @@ set a, a
 set a, a
 set a, a
 set a, a
-jsr [0]
+jsr [SYS_YIELD]
 set pc, procs_func
 
 :loader_func 
@@ -286,7 +337,7 @@ set a, a
 set a, a
 set a, a
 set a, a
-jsr [0]
+jsr [SYS_YIELD]
 set pc, loader_func
 
 
@@ -333,80 +384,36 @@ set pc, memset_lp_cond
 :kernel_bss_start
 
 :pid_alloc
-dat namealloc            ;common_name
-dat 0,0,0,0              ;reserved
-dat pid_init,pid_procs
-dat allocstack           ;saved sp
-dat 0                    ;msg start, qty
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
-dat 0                    ;reserved
-dat 0, 0                 ;std in/out procs - unimplemented
 
+org (pid_alloc+32)
 :pid_procs
-dat nameprocs            ;common_name
-dat 0,0,0,0              ;reserved
-dat pid_alloc,pid_loader
-dat procsstack           ;saved sp
-dat 0                    ;msg start, qty
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
-dat 0                    ;reserved
-dat 0, 0                 ;std in/out procs - unimplemented
 
+org (pid_procs+32)
 :pid_loader
-dat nameloader           ;common_name
-dat 0,0,0,0              ;reserved
-dat pid_procs,pid_init
-dat loaderstack          ;saved sp
-dat 0                    ;msg start, qty
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
-dat 0                    ;reserved
-dat 0, 0                 ;std in/out procs - unimplemented
 
+org (pid_loader+32)
 :pid_init
-dat nameinit             ;common_name
-dat 0,0,0,0              ;reserved
-dat pid_loader,pid_alloc
-dat initstack            ;saved sp
-dat 0                    ;msg start, qty
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
-dat 0                    ;reserved
-dat 0, 0                 ;std in/out procs - unimplemented
 
 
+org (pid_init+32)
 
 :alloc_map_start
-dat 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 ;simulating uninitialized data for the hell of it
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 ;in this section. Not sure what "reset" will look
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 ;like so I'm building it in from the start.
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 
+org (alloc_map_start+256)
 :alloc_map_end
-dat 0, 0, 0, 0, 0, 0, 0, 0
+
+
+org (alloc_map_end+8)
 :initstack
 
-dat 0, 0, 0, 0, 0, 0, 0
+org (initstack+8)
 :loaderstack
-dat 0
 
-
-dat 0, 0, 0, 0, 0, 0, 0
+org (loaderstack+8)
 :procsstack
-dat 0
 
-dat 0, 0, 0, 0, 0, 0, 0
+
+org (procsstack+8)
 :allocstack
-dat 0
 
 :kernel_bss_end
