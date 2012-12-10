@@ -10,8 +10,14 @@ dat pid_procs
 dat pid_loader
 
 :kickoff
+;fill syscall entries covered by jump
 set [0], sys_yield
 set [1], sys_msg
+
+;setup initial stacks
+set [loaderstack], loader_func
+set [allocstack], alloc_func
+set [procsstack], procs_func
 
 set sp, initstack
 set pc, init_func
@@ -153,13 +159,6 @@ dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
 dat 0                    ;reserved
 dat 0, 0                 ;std in/out procs - unimplemented
 
-
-dat 0, 0, 0, 0, 0, 0, 0
-:allocstack
-dat alloc_func
-
-
-
 :pid_procs
 dat nameprocs            ;common_name
 dat 0,0,0,0              ;reserved
@@ -170,13 +169,6 @@ dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
 dat 0                    ;reserved
 dat 0, 0                 ;std in/out procs - unimplemented
 
-
-dat 0, 0, 0, 0, 0, 0, 0
-:procsstack
-dat procs_func
-
-
-
 :pid_loader
 dat nameloader           ;common_name
 dat 0,0,0,0              ;reserved
@@ -186,13 +178,6 @@ dat 0                    ;msg start, qty
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;pending message array
 dat 0                    ;reserved
 dat 0, 0                 ;std in/out procs - unimplemented
-
-
-dat 0, 0, 0, 0, 0, 0, 0
-:loaderstack
-dat loader_func
-
-
 
 :pid_init
 dat nameinit             ;common_name
@@ -205,8 +190,7 @@ dat 0                    ;reserved
 dat 0, 0                 ;std in/out procs - unimplemented
 
 
-dat 0, 0, 0, 0, 0, 0, 0, 0
-:initstack
+
 
 
 :init_func 
@@ -245,7 +229,6 @@ set pc, init_func
 
 
 
-
 :procs_func 
 set a, a
 set a, a
@@ -265,13 +248,6 @@ set a, a
 set a, a
 jsr [0]
 set pc, loader_func
-
-
-
-
-
-
-
 
 
 :memset         
@@ -311,14 +287,6 @@ set pc, memset_lp_cond
 	sub pc, b
 
 
-
-
-
-
-
-
-
-
 :kernel_text_end
 
 :kernel_bss_start
@@ -340,7 +308,22 @@ dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 dat 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-:alloc_map_end
 
+:alloc_map_end
+dat 0, 0, 0, 0, 0, 0, 0, 0
+:initstack
+
+dat 0, 0, 0, 0, 0, 0, 0
+:loaderstack
+dat 0
+
+
+dat 0, 0, 0, 0, 0, 0, 0
+:procsstack
+dat 0
+
+dat 0, 0, 0, 0, 0, 0, 0
+:allocstack
+dat 0
 
 :kernel_bss_end

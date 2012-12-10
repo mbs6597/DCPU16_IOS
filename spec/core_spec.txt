@@ -12,7 +12,6 @@ Core System Structs & deffinitions:
 struct {
 	u16 code;    //A non 0 code indicates a completion
 	u16 message;
-	struct completion *next;
 } completion;
 
 struct {

@@ -1,15 +1,11 @@
 There are a few basic processes that can be messaged to do core operating system functions. They will have PID pointers in the listed static memory locations.
 Ex. set a, [5] sets A to the PID of the ALLOC process.
 
-TODO: Come up with more standardized completion error conventions.
-
 PID Address  Name   Features
 5            ALLOC  Coarse grained allocator. Allocates and frees memory for tasks or libraries.
 6            PROCS  Access to the creation and destruction of processes.
 7            LOADER Loads and Links compiled binaries into meory, for tasks or libraries.
-
-8            -      
-
+ 
 
 Process Message Interfaces:
 
