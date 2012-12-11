@@ -48,7 +48,7 @@ org kernel_text_start+2
 	;setup core PID structs
 	set i, pid_alloc
 	set x, namealloc
-	set y, allocstack-1
+	set y, allocstack_end-1
 	set j, 0
 	
 	jsr mkblankproc
@@ -56,7 +56,7 @@ org kernel_text_start+2
 	
 	set i, pid_procs
 	set x, nameprocs
-	set y, procsstack-1
+	set y, procsstack_end-1
 	set j, pid_alloc
 	
 	jsr mkblankproc
@@ -64,7 +64,7 @@ org kernel_text_start+2
 	
 	set i, pid_loader
 	set x, nameloader
-	set y, loaderstack-1
+	set y, loaderstack_end-1
 	set j, pid_procs
 	
 	jsr mkblankproc
@@ -72,19 +72,19 @@ org kernel_text_start+2
 	
 	set i, pid_init
 	set x, nameinit
-	set y, initstack-1
+	set y, initstack_end-1
 	set j, pid_loader
 	
 	jsr mkblankproc
 
 ;setup initial stacks
-	set [loaderstack-1], loader_func
-	set [allocstack-1], alloc_func
-	set [procsstack-1], procs_func
+	set [loaderstack_end-1], loader_func
+	set [allocstack_end-1], alloc_func
+	set [procsstack_end-1], procs_func
 
 ;dive into init process
 	set [SYS_CURRENT], pid_init
-	set sp, initstack
+	set sp, initstack_end
 	set pc, init_func
 
 :kickoff_end
@@ -216,19 +216,19 @@ org kernel_text_start+2
 
 ;sys_wfcomp_fn - Wait for a completion struct to be filled in. Yielding as
 ;many times as necessary. Must be in a valid process context.
-;preconditions: A ponts to a completion struct. The struct does not need to be
-;initialized.
+;preconditions: A ponts to a completion struct. The struct does not needs to be
+;initialized to have a code in 0 before the condition that triggers it may have fired.
+;(ie, if waiting for another process' response to a sent message, you can do it after
+; the message is delivered, but before you yield. If you want to wait for an interrupt
+; the code must be zeroed before the intterupt is enabled.)
 ;post conditions: A completion was sent to the targetd struct. B will contain
 ;the code, C will contain the message. A will be unchanged. All other registers
 ;may have changed.
-:sys_wfcomp_fn
-	set [a], 0
-	set [a+1], 0
-
 :sys_wfcomp_lp
 	set push, a
 	jsr sys_yield_fn
 	set a, pop
+:sys_wfcomp_fn
 	ife [a], 0
 	set pc, sys_wfcomp_lp
 
@@ -304,7 +304,7 @@ org kernel_text_start+2
 ;                                                                             ;
 
 
-;memset - set a block of words to a single value
+;memset - set a block of words to a single value (duffs device implementation)
 ;preconditions: i is the start address of memory to be initialized
 ;b is length to be written and c is the value to write to each word
 ;postconditions:
@@ -339,8 +339,9 @@ set pc, memset_lp_cond
 	ifu b, 1
 	set pc, pop
 
-	add b, 7
-	sub pc, b
+	set push, b
+	add peek, 9
+	sub pc, pop
 
 :memset_end
 
@@ -351,39 +352,172 @@ set pc, memset_lp_cond
 
 
 :init_func 
-	set a, a
-	set a, a
-	set a, a
-	set a, a
-	set a, a
-	set a, a
+	set a, [SYS_ALLOC]
+	set b, 1
+	set x, 740
+	set y, [SYS_CURRENT]
+	
+	set push, 0
+	set push, 0
+	
+	set z, sp
+
+	jsr [SYS_MSG]
+	
+	set a, sp
+	jsr [SYS_WFCOMP]
+	
+:init_end
 	jsr [SYS_YIELD]
-	set pc, init_func
+	set pc, init_end
 
 :alloc_func
 ;Have alloc claim all of the static kernel image as its own memory
 	set x, kernel_bss_end
-	shr x, 8
-
+	;divide by 256 round up
+	shr x, 8   
 	ifn ex, 0
-	add x, 1  ;divide by 256 round up
-
-	set i, alloc_map_start
+	add x, 1  
+	
+	;tag those blocks as being owned
+	set i, alloc_map
 	set b, x
 	set c, pid_alloc
 	
 	jsr memset
 	
-	set b, alloc_map_end - alloc_map_start
-	sub b, x
-	set c, 0
 	
-	jsr memset
+	;add the rest to a single node in the free linked list
+	;head word of of free list node = (size of free block << 8) | next free block start index
+	;in this case the next free block will be null
+	set [alloc_freelist], x
+	
+	set b, alloc_map_end-alloc_map
+	sub b, x
+	shl b, 8
+	
+	set [alloc_map+x], b
 	
 :alloc_loop
+	jsr [SYS_GETMSG]
+	
+	ife a, 0
+	set pc, alloc_nomsg
+	
+	ife b, 1
+	set pc, alloc_allocate
+	
+	ife b, 2
+	set pc, alloc_free
+	
+	ife b, 3
+	set pc, alloc_freeall
+	
+	;at this point unknown message
+
+:alloc_nomsg
+:alloc_idle
 	jsr [SYS_YIELD]
 	set pc, alloc_loop
 
+:alloc_allocate
+;x words to allocate, y new owner, z completion struct
+	set push, z
+	set a, x
+;calculate blocks to allocate = a/256 round up
+	shr a, 8
+	ifn ex, 0
+	add a, 1
+	
+	set x, [alloc_freelist]
+	set z, alloc_freelist
+:alloc_allocate_lp
+	;x is index of current node in array
+	;z is memory address of previous node (or list head)
+	
+	ife a, 0
+	set pc, alloc_allocate_fail
+	
+	;get size of current block, and next block index
+	;y = size, i = next index
+	set b, [alloc_map+x]
+	shr b, 8
+	set i, ex
+	shr i, 8
+	
+	;will the current block be big enough?
+	ifl b, x
+	set pc, alloc_allocate_nextblk
+	
+	;will we consume the entire block?
+	ife b, x
+	set pc, alloc_allocate_fullblock
+	
+	;create new header from the current one
+	sub b, x
+	shl b, 8
+	bor b, i
+	
+	;calculate next header index
+	set j, x
+	add j, a
+	
+	;store this index in the previous node's next-index-octet
+	and [z], 0xFF00
+	bor [z], j
+	
+	;store the new header in the new index
+	set [alloc_map+j], b
+	
+	set z, pop
+	set pc, alloc_allocate_complete
+	
+:alloc_allocate_fullblock
+	;skip this block entirely by setting previous' next to our next
+	and [z], 0xFF00
+	bor [z], i
+	
+:alloc_allocate_complete
+	;x: number of blocks allocated
+	;y: new owner
+	;z: completion struct
+	;a: index of first free block allocated
+	
+	;call memset
+	set c, y
+	set b, a
+	set i, x
+	add i, alloc_map
+	
+	jsr memset
+	
+	set a, 1
+	set b, x
+	shl b, 8
+	set c, z
+	
+	jsr [SYS_COMP]
+	
+	set pc, alloc_idle
+	
+:alloc_allocate_nextblk
+	;move onto next block
+	set z, alloc_map
+	add z, x
+	set x, i
+	
+	set pc, alloc_allocate_lp
+
+:alloc_allocate_fail
+	set a, 3 ;code = EXECUTION_ERROR
+	set b, 3 ;message = resource unavailable
+	jsr [SYS_COMP]
+	set pc, alloc_idle
+	
+:alloc_free
+:alloc_freeall
+
+set pc, alloc_idle
 
 
 :procs_func 

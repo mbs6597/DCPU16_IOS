@@ -25,3 +25,10 @@
 #define SPACE(words)\
 :spacemaker»\
 org spacemaker+words
+
+#define DIM(name, words)»\
+:##name »\
+SPACE(words)»\
+:##name##_end»
+
+

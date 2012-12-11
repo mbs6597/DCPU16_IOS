@@ -1,36 +1,23 @@
 :kernel_bss_start
 
-:pid_alloc
+DIM(pid_alloc, 32)
 
-org (pid_alloc+32)
-:pid_procs
+DIM(pid_procs, 32)
 
-org (pid_procs+32)
-:pid_loader
+DIM(pid_loader, 32)
 
-org (pid_loader+32)
-:pid_init
+DIM(pid_init, 32)
 
+DIM(alloc_freelist, 1)
 
-org (pid_init+32)
+DIM(alloc_map, 256)
 
-:alloc_map_start
+DIM(initstack, 8)
 
-org (alloc_map_start+256)
-:alloc_map_end
+DIM(loaderstack, 8)
 
+DIM(procsstack, 8)
 
-org (alloc_map_end+8)
-:initstack
-
-org (initstack+8)
-:loaderstack
-
-org (loaderstack+8)
-:procsstack
-
-
-org (procsstack+8)
-:allocstack
+DIM(allocstack, 8)
 
 :kernel_bss_end
