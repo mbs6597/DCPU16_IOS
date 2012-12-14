@@ -19,3 +19,12 @@
 #define msg_p3        4
 #define msg_size      5
 
+#define CODE_OK              1
+#define CODE_STATE_ERROR     2
+#define CODE_EXECUTION_ERROR 3
+#define CODE_UNSUPPORTED     4
+
+#define ERROR_NONE           0
+#define ERROR_IO             1
+#define ERROR_LOGICAL        2
+#define ERROR_UNAVAILABLE    3

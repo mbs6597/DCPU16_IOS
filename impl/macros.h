@@ -9,3 +9,9 @@ org spacemaker+words
 :##name »\
 SPACE(words)»\
 :##name##_end»
+
+#define EXPORT(name) »\
+SYMBOL_SECTION »\
+dat #name, 0 »\
+dat name»\
+TEXT_SECTION»\

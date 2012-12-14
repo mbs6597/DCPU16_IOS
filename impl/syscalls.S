@@ -8,6 +8,7 @@ TEXT_SECTION
 ;Postconditions: In thread-local context, all registers may have been changed.
 ;The A register will contain the pointer to the current process id struct.
 :sys_yield_fn
+	jsr do_tasklets
 	set a, [SYS_CURRENT]
 	set [a+task_saved_sp], sp
 	set a, [a+task_sched_next]

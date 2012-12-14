@@ -2,7 +2,7 @@ rm -f raw_output* compiled_output* output*
 
 headers=$(find . -name '*.h')
 asmfiles=$(find . -name '*.S')
-sections=( RAW TEXT DATA BSS )
+sections=( RAW TEXT DATA BSS SYMBOL )
 
 filtersection() {
 	lastSection=""
